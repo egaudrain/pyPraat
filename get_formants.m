@@ -12,7 +12,7 @@ function [dat, r] = get_formants(filename, method, time_step, n_formants, max_fr
 %     obtained, in seconds (default 0.005). 0 means auto (see Praat).
 %   - N_FORMANTS is the number of extracted formants (default, 5).
 %   - MAX_FREQ is the maximal formant frequency (in Hertz, default 5500).
-%   - W_LEN is the analysis window length used to estimate LPC order that 
+%   - W_LEN is the analysis window length used to estimate LPC order that
 %     will be used for formant estimation (in seconds, default 0.025).
 %   - EXPORT_METHOD is the method used by the underlying Python script to
 %     send the data back to Matlab. The possible values are 'matlabliteral'
@@ -37,12 +37,10 @@ function [dat, r] = get_formants(filename, method, time_step, n_formants, max_fr
 %   - intensity: the intensity of the time segment
 %   - t: the time at the time segment
 %
-%   This function requires Python 2.7 to be installed, and in the path, as 
+%   This function requires Python 3.7 to be installed, and in the path, as
 %   well as Praat (installed at its normal location).
 
-% Generate a temporary sound file 
-
-%pyversion('/home/crouzet-o/anaconda3/envs/python2/bin/python');
+% Generate a temporary sound file
 
 p = mfilename('fullpath');
 py = fullfile(fileparts(p), 'get_formants.py');
@@ -52,11 +50,11 @@ if nargin<2
 end
 
 if nargin<3
-    time_step = 0.005;
+    time_step = 6.25e-3;
 end
 
 if nargin<4
-    w_len = 0.05;
+    n_formants = 5;
 end
 
 if nargin<5
@@ -64,7 +62,7 @@ if nargin<5
 end
 
 if nargin<6
-    n_formants = 5;
+    w_len = 0.025;
 end
 
 if nargin<7
@@ -75,7 +73,7 @@ end
 % get_formants.m acts on a file. Could / Should it be meant to act on a matlab matrix
 % / wave structure by providing a sound object as input and copying it on
 % temporary disk space?
-[s, r] = system(sprintf('python2 "%s" --method "%s" --timestep %f --wlen %f --maxfreq %0d --nformants %0d --export "%s" "%s"', py, method, time_step, w_len, max_freq, n_formants, export_method, absolute_path(filename)));
+[s, r] = system(sprintf('python "%s" --method "%s" --timestep %f --wlen %f --maxfreq %0d --nformants %0d --export "%s" "%s"', py, method, time_step, w_len, max_freq, n_formants, export_method, absolute_path(filename)));
 % Note: Used which(filename) to get an absolute path
 
 r = strtrim(r);

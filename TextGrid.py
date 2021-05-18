@@ -68,7 +68,7 @@ class TextGrid:
 			for i in range(len(self.intervals[j])):
 				s += 'x.interval(%d).label(%d).x = [%f, %f];\n' % (j+1, i+1, self.intervals[j][i]['xmin'], self.intervals[j][i]['xmax'])
 				s += 'x.interval(%d).label(%d).text = \'%s\';\n' % (j+1, i+1, self.intervals[j][i]['text'])
-		print s
+		print(s)
 
 #==============================================
 

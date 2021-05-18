@@ -10,6 +10,9 @@
 # parses the formant file and can export it in various format.
 #-------------------------------------------------------------------------------
 # E. Gaudrain <etienne.gaudrain@cnrs.fr> - 2017-02-21
+#
+# 2021-05-18: Added module interface.
+#
 # Copyright CNRS (FR), UMCG (NL) and the authors.
 #
 # This program is free software: you can redistribute it and/or modify
@@ -33,16 +36,6 @@ import platform
 import os.path
 import re
 import numpy
-
-parser = argparse.ArgumentParser(description='Compute formants for a WAV file using Praat.', epilog='Written by Etienne Gaudrain <etienne.gaudrain@cnrs.fr>\nCopyright 2017 CNRS (FR), UMCG (NL)', formatter_class=argparse.RawDescriptionHelpFormatter)
-parser.add_argument('filename', metavar='FILE', help="The sound file to process.")
-parser.add_argument('--method', help="The method used to extract the formants (see Praat).", default='burg', choices=['burg'])
-parser.add_argument('--timestep', metavar='TIME_STEP', help="The time interval between two consecutive formant estimates (in seconds, default: 0.005).", default=0.05, type=float)
-parser.add_argument('--wlen', metavar='W_LEN', help="The analysis window length (in seconds, default: 0.0025).", default=0.0025, type=float)
-parser.add_argument('--maxfreq', metavar='MAX_FREQ', help="The maximal frequency (Hz, default: 5500).", default=5500, type=float)
-parser.add_argument('--nformants', metavar='N_FORMANTS', help="The number of resulting formants (default: 5).", default=5, type=float)
-parser.add_argument('--export', help="Format in which the data should be exported (default 'none'). If a file format is given, an output filename may also be provided or the progam will generate one and will return it.", default='none', choices=['none', 'matlabliteral', 'matfile', 'json', 'jsonfile'])
-parser.add_argument('--exportfile', help="File to which the data will be exported, if the export format is a file.")
 
 # Added options: wlength, maxfreq, nformants
 
@@ -81,17 +74,39 @@ elif p=='Linux':
 else:
 	raise ValueError("No implementation for this platform (%s). Don't know where to find Praat..." % p)
 
+if not os.path.exists(praat_path):
+	raise ValueError("Could not find Praat in %s..." % praat_path)
+
 #=================================================
 
+parser = argparse.ArgumentParser(description='Compute formants for a WAV file using Praat.', epilog='Written by Etienne Gaudrain <etienne.gaudrain@cnrs.fr>\nCopyright 2017 CNRS (FR), UMCG (NL)', formatter_class=argparse.RawDescriptionHelpFormatter)
+parser.add_argument('filename', metavar='FILE', help="The sound file to process.")
+parser.add_argument('--method', help="The method used to extract the formants (see Praat).", default='burg', choices=['burg'])
+parser.add_argument('--timestep', metavar='TIME_STEP', help="The time interval between two consecutive formant estimates (in seconds, default: 0.00625).", default=0.00625, type=float)
+parser.add_argument('--wlen', metavar='W_LEN', help="The analysis window length (in seconds, default: 0.025).", default=0.025, type=float)
+parser.add_argument('--maxfreq', metavar='MAX_FREQ', help="The maximal frequency (Hz, default: 5500).", default=5500, type=float)
+parser.add_argument('--nformants', metavar='N_FORMANTS', help="The number of resulting formants (default: 5).", default=5, type=float)
+parser.add_argument('--export', help="Format in which the data should be exported (default 'none'). If a file format is given, an output filename may also be provided or the progam will generate one and will return it.", default='none', choices=['none', 'matlabliteral', 'matfile', 'json', 'jsonfile'])
+parser.add_argument('--exportfile', help="File to which the data will be exported, if the export format is a file.")
+
+DEFAULT_VALUES = vars(parser.parse_args(['']))
+
 def call(args):
-	root, ext = os.path.splitext(args.filename)
+
+	if isinstance(args, argparse.Namespace):
+		args = vars(args)
+
+	if 'filename' not in args:
+		raise ValueError('You need to provide a filename...')
+
+	root, ext = os.path.splitext(args['filename'])
 	filename_formant = root + '.formant'
 
 	praat_script_name = __file__.replace('.py', '.praat')
 
 	open(praat_script_name, 'w').write(praat_script)
 
-	cmd = [praat_path, '--run', praat_script_name, args.filename, filename_formant, args.method, str(args.timestep), str(args.nformants), str(args.maxfreq), str(args.wlen)]
+	cmd = [praat_path, '--run', praat_script_name, args['filename'], filename_formant, args['method'], str(args['timestep']), str(args['nformants']), str(args['maxfreq']), str(args['wlen'])]
 
 	#print(subprocess.list2cmdline(cmd))
 
@@ -104,26 +119,30 @@ def call(args):
 
 RE_TYPE = type(re.compile(''))
 
-class Formant:
+class Formants:
 	"""A class to represent and import formant information for a sound file."""
-	def __init__(self):
+	def __init__(self, wav_filename=None, **kwargs):
+
         #self.test = None
 		self.f = None
 		self.i = -1 # Current line index
 		self.data = None
 
+		if wav_filename is not None:
+			self.from_wav_file(wav_filename, **kwargs)
+
 	def from_praat_text(self, filename):
 		"""Opens and parses a Praat Text file containing formant information. The data is
 		then available in self.data."""
 
-		self.f = [x.strip() for x in open(filename, 'rb')]
+		self.f = [x.strip() for x in open(filename, 'r')]
 		self.n = len(self.f) # Size of file
 		self.i = -1
-        
+
 		if self.f[0] != 'File type = "ooTextFile"':
-			raise ValueError("The file isn't a valid Praat Text file (header: '%s'" % self.f[0])
+			raise ValueError("The file isn't a valid Praat Text file (header: '%s')" % self.f[0])
 		if self.f[1] != 'Object class = "Formant 2"':
-			raise ValueError("The file isn't a valid Praat Formant 2 file (header: '%s'" % self.f[0])
+			raise ValueError("The file isn't a valid Praat Formant 2 file (header: '%s')" % self.f[0])
 
 		self.i = 2
 
@@ -142,7 +161,7 @@ class Formant:
 			self.data[k] = float(self.last_match.group(1))
 		self.data['nx'] = int(self.data['nx'])
 		self.data['maxnFormants'] = int(self.data['maxnFormants'])
-        
+
 		self.data['t'] = list()
 		self.data['formants'] = list()
 		self.data['bandwidths'] = list()
@@ -168,8 +187,8 @@ class Formant:
 			self.i = i_frame
 			self._find_line(re_['formant_array'])
             #print("  Formant [] on line", self.i)
-			formants = [numpy.nan]*10  # Should be the number of requested formants
-			bandwidths = [numpy.nan]*10  # Should be the number of requested formants
+			formants = [numpy.nan]*self.data['maxnFormants']  # Should be the number of requested formants
+			bandwidths = [numpy.nan]*self.data['maxnFormants']  # Should be the number of requested formants
 			while self._find_line(re_['formant']):
 				formant_i = int(self.last_match.group(1))-1
 
@@ -208,7 +227,7 @@ class Formant:
 					self.i = k
 					return self.f[k]
 
-		elif isinstance(pattern, str) or isinstance(pattern, unicode):
+		elif isinstance(pattern, str):
 			for k in range(i,self.n):
 				if self.f[k].startswith(pattern):
 					self.i = k
@@ -223,7 +242,7 @@ class Formant:
 			raise ValueError("Trying to export an empty formant data set. Call an import method first (e.g. from_praat_text).")
 
 		s = list()
-		for k,v in self.data.iteritems():
+		for k,v in self.data.items():
 			f = ["'%s'" % k]
 			f.append(self._list_to_matlab_string(v))
 			s.extend(f)
@@ -252,11 +271,25 @@ class Formant:
 		import scipy.io
 		scipy.io.savemat(mat_filename, self.data, do_compression=True)
 
+	def from_wav_file(self, wav_filename, **kwargs):
+
+		args = kwargs
+		args['filename'] = wav_filename
+
+		for k in DEFAULT_VALUES:
+			if k not in args:
+				args[k] = DEFAULT_VALUES[k]
+
+		filename_formant, c, o, e = call(args)
+
+		self.from_praat_text(filename_formant)
+
 
 
 #=================================================
 
 if __name__=='__main__':
+
 	args = parser.parse_args()
 	filename_formant, c, o, e = call(args)
 
@@ -266,26 +299,22 @@ if __name__=='__main__':
 	if args.export is None or args.export=='none':
 		print(filename_formant)
 	else:
-		f = Formant()
+		f = Formants()
 		f.from_praat_text(filename_formant)
 
 		if args.export == 'matlabliteral':
-			print(f.to_matlab_literal())
+			print((f.to_matlab_literal()))
 		elif args.export == 'matfile':
 			if args.exportfile is None:
 				args.exportfile = filename_formant + '.mat'
 			f.to_matlab_mat(args.exportfile)
-			print(args.exportfile)
+			print((args.exportfile))
 		elif args.export == 'json':
 			import json
-			print(json.dumps(f.data))
+			print((json.dumps(f.data)))
 		elif args.export == 'jsonfile':
 			import json
 			if args.exportfile is None:
 				args.exportfile = filename_formant + '.json'
 			json.dump(f.data, open(args.exportfile, 'wb'))
-			print(args.exportfile)
-
-
-
-
+			print((args.exportfile))
