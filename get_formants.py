@@ -99,6 +99,8 @@ def call(args):
 	if 'filename' not in args:
 		raise ValueError('You need to provide a filename...')
 
+	args['filename'] = os.path.abspath(args['filename'])
+
 	root, ext = os.path.splitext(args['filename'])
 	filename_formant = root + '.formant'
 
@@ -281,6 +283,9 @@ class Formants:
 				args[k] = DEFAULT_VALUES[k]
 
 		filename_formant, c, o, e = call(args)
+
+		if c!=0:
+			raise Exception(e)
 
 		self.from_praat_text(filename_formant)
 
