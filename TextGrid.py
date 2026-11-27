@@ -75,6 +75,6 @@ class TextGrid:
 #~ if __name__=='__main__':
 	#~ tg = TextGrid(r'D:\Sounds\for Matt\Cc_01_l1.TextGrid')
 	#~ tg.matlabDisp()
-
-tg = TextGrid(sys.argv[1])
-tg.matlabDisp()
+if __name__=='__main__':
+	tg = TextGrid(sys.argv[1])
+	tg.matlabDisp()
